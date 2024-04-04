@@ -76,8 +76,19 @@ const Product=mongoose.model("Product",{
 })
 
 app.post('/addproduct',async (req,res)=>{
+    //id automatically generated in database
+    let products=await Product.find({});
+    let id;
+    if(products.length>0){
+        let last_product_array=products.slice(-1);
+        let last_product=last_product_array[0];
+        id=last_product.id+1;
+    }
+    else{
+        id=1;
+    }
     const product=new Product({
-        id:req.body.id,
+        id:id,
         name:req.body.name,
         image:req.body.image,
         category:req.body.category,
@@ -95,11 +106,17 @@ app.post('/addproduct',async (req,res)=>{
 
 app.post('/removeproduct', async (req,res)=>{
     await Product.findOneAndDelete({id:req.body.id});
-    console.log("remove");
+    console.log("Removed");
     res.json({
         success: true,
         name:req.body.name
     })
+})
+
+app.get('/allproducts',async (req,res)=>{
+    let products=await Product.find({});
+    console.log("All products Fetched");
+    res.send(products);
 })
 
 app.listen(port,(error)=>{
@@ -108,5 +125,75 @@ app.listen(port,(error)=>{
     }
     else{
         console.log("Error: "+error)
+    }
+})
+
+//add user 
+const User = mongoose.model('Users',{
+    name:{
+        type:String,
+    },
+    email:{
+        type:String,
+        unique:true,
+    },
+    password:{
+        type:String,
+    },
+    cartData:{
+        type:Object,
+    },
+    date:{
+        type:Date,
+        default:Date.now,
+    }
+})
+
+//signup
+app.post('/signup', async(req,res)=>{
+    let check = await User.findOne({email : req.body.email});
+    if(check){
+        return res.status(400).json({success:false,errors:"Email already exists"})
+    }
+    let cart = {};
+    for (let i = 0; i < 300; i++){
+        cart[i] = 0;
+    }
+    const user = new User({
+        name : req.body.name ,
+        email : req.body.email ,
+        password : req.body.password,
+        cartData : cart,
+    })
+    await user.save();
+    const data = {
+        user:{
+            id:user.id,
+        }
+    }
+    const token = jwt.sign(data, 'secret_Tech');
+    res.json({success:true, token});
+}) 
+
+//login
+app.post("/login",async(req,res) =>{
+    const user = await User.findOne({email:req.body.email});
+    if(user){
+        const passCompare = req.body.password === user.password;
+        if(passCompare){
+            const data={
+                user:{
+                    id:user.id
+                }
+            }
+            const token=jwt.sign(data,'secret_Tech');
+            res.json({success:true,token});
+        }
+        else{
+            res.json({success:false,errors:'Wrong password! Please try again.'});
+        }
+    }
+    else{
+        res.json({success:false,errors:"Wrong email! Please try again."});
     }
 })
